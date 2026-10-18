@@ -1,0 +1,35 @@
+{
+  "node": {
+    "00f4b6d175ab8d2f28f8fa30f8c044af502f54dd51": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": 98653,
+          "async": false
+        }
+      },
+      "exportedName": "logoutAction",
+      "filename": "src/app/(auth)/actions.ts"
+    },
+    "403164ac83a0ee67b7e5e13e53e9fe09b6740a7eaa": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": 98653,
+          "async": false
+        }
+      },
+      "exportedName": "loginAction",
+      "filename": "src/app/(auth)/actions.ts"
+    },
+    "406ef07ce1dc09051502b5713cc1be7cf225a06261": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": 98653,
+          "async": false
+        }
+      },
+      "exportedName": "registerAction",
+      "filename": "src/app/(auth)/actions.ts"
+    }
+  },
+  "edge": {}
+}
