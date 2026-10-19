@@ -16,7 +16,7 @@ export default function HomePage() {
       </nav>
 
       <section className="hero">
-        <p className="eyebrow"><span className="status-dot" /> MARKETPLACE JASA INDEPENDEN</p>
+
         <h1>Keahlianmu.<br /><span>Jadi peluang.</span></h1>
         <p className="hero-copy">Temukan jasa yang kamu butuhkan, atau mulai tawarkan keahlianmu kepada lebih banyak orang.</p>
         <div className="hero-actions">
