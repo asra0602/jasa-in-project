@@ -42,6 +42,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      import SaweriaLeaderboard from "@/components/SaweriaLeaderboard";
+      
       <footer className="footer">
         <a className="brand brand-footer" href="/">jasa<span>-</span>in</a>
         <p>Tempat keahlian menemukan kebutuhan.</p>
