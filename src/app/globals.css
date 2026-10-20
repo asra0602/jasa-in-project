@@ -815,3 +815,101 @@ select:focus-visible {
   .role-options { grid-template-columns: 1fr; }
   .footer { align-items: flex-start; flex-direction: column; }
 }
+
+.donors-section {
+    border-top: 1px solid var(--line);
+      padding: 64px 0 88px;
+      }
+      .donors-leaderboard {
+        display: grid;
+          border: 1px solid var(--line);
+            background: var(--surface);
+              border-radius: 4px;
+              }
+              .donor-row {
+                display: flex;
+                  align-items: flex-start;
+                    justify-content: space-between;
+                      gap: 16px;
+                        padding: 18px 22px;
+                          border-bottom: 1px solid var(--line);
+                          }
+                          .donor-row:last-child {
+                            border-bottom: 0;
+                            }
+                            .donor-row-first {
+                              background: #fbfdf5;
+                              }
+                              .donor-rank-wrap {
+                                display: flex;
+                                  align-items: flex-start;
+                                    gap: 14px;
+                                      min-width: 0;
+                                      }
+                                      .donor-rank {
+                                        min-width: 36px;
+                                          height: 32px;
+                                            display: inline-flex;
+                                              align-items: center;
+                                                justify-content: center;
+                                                  font-size: 13px;
+                                                    font-weight: 800;
+                                                      border-radius: 3px;
+                                                        background: var(--background);
+                                                          border: 1px solid var(--line);
+                                                            color: var(--muted);
+                                                              flex-shrink: 0;
+                                                              }
+                                                              .donor-rank-top {
+                                                                background: var(--accent);
+                                                                  border-color: #a8d446;
+                                                                    color: var(--foreground);
+                                                                    }
+                                                                    .donor-info {
+                                                                      display: grid;
+                                                                        gap: 4px;
+                                                                          min-width: 0;
+                                                                          }
+                                                                          .donor-name-line {
+                                                                            display: flex;
+                                                                              flex-wrap: wrap;
+                                                                                align-items: baseline;
+                                                                                  gap: 8px;
+                                                                                  }
+                                                                                  .donor-name {
+                                                                                    font-size: 15px;
+                                                                                      color: var(--foreground);
+                                                                                      }
+                                                                                      .donor-count {
+                                                                                        font-size: 12px;
+                                                                                          color: var(--muted);
+                                                                                          }
+                                                                                          .donor-message {
+                                                                                            margin: 0;
+                                                                                              font-size: 13px;
+                                                                                                color: var(--muted);
+                                                                                                  line-height: 1.5;
+                                                                                                    word-break: break-word;
+                                                                                                    }
+                                                                                                    .donor-amount {
+                                                                                                      font-size: 16px;
+                                                                                                        font-weight: 800;
+                                                                                                          color: var(--foreground);
+                                                                                                            white-space: nowrap;
+                                                                                                              flex-shrink: 0;
+                                                                                                              }
+
+                                                                                                              @media (max-width: 680px) {
+                                                                                                                .donors-section {
+                                                                                                                    padding: 48px 0 64px;
+                                                                                                                      }
+                                                                                                                        .donor-row {
+                                                                                                                            flex-direction: column;
+                                                                                                                                gap: 10px;
+                                                                                                                                    padding: 16px;
+                                                                                                                                      }
+                                                                                                                                        .donor-amount {
+                                                                                                                                            padding-left: 50px;
+                                                                                                                                              }
+                                                                                                                                              }
+
