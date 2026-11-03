@@ -9,6 +9,17 @@ Pembaruan model pembayaran: 3 November 2026 — pembayaran berubah dari QRIS per
 
 ---
 
+## Checklist pembaruan — Sinkronisasi checklist (3 November 2026)
+
+Dokumen-only: tidak ada perubahan kode. Centang di bawah diperbarui berdasarkan
+kejadian yang sudah terverifikasi malam ini, bukan janji baru.
+- [x] PR #1 di-merge ke main (dee04de, 3 Nov 2026 ~19:53 WITA) dan deploy produksi diverifikasi Ready (24 detik, jasa-in.my.id, ~19:54 WITA)
+- [x] Halaman detail layanan dari PR #1 sudah live lewat merge yang sama
+- [x] PR #2 keamanan order di-merge (aaff2da) dan deploy produksi diverifikasi Ready (16 detik, ~22:45 WITA)
+- [x] PR #3 galeri foto di-merge (9b9b832) dan deploy produksi diverifikasi Ready (18 detik, ~22:55 WITA)
+- [x] Role admin Asra dan migrasi 003/004 terverifikasi di Supabase (~23:00 WITA; kebijakan/tabel/bucket sudah ada di database, SQL tidak dijalankan ulang untuk menghindari duplikat)
+- [ ] Masih tertunda: variable Vercel yang hilang dengan nilai baru hasil rotasi, RPC atomik penuh (S7), dan rilis QRIS pusat
+
 ## Checklist pembaruan — PR #1 (3 November 2026)
 
 Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pembaruan, checklist ini diperbarui di commit yang sama.
@@ -18,10 +29,10 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [x] Konfirmasi pembayaran dibuka untuk admin di kode + migrasi `003_admin_payments.sql` disiapkan (belum diterapkan di Supabase)
 - [x] `.env.local` dihapus dari branch + `.env.example` dibuat (nama key saja, tanpa nilai)
 - [x] Dokumen ini diperbarui ke model QRIS pusat
-- [ ] PR #1 di-merge ke main
-- [ ] Deploy produksi diverifikasi setelah merge
+- [x] PR #1 di-merge ke main
+- [x] Deploy produksi diverifikasi setelah merge
 - [ ] Variable Vercel yang hilang diisi dengan nilai baru hasil rotasi: SAWERIA_URL, SAWERIA_WEBHOOK_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, plus slot QRIS pusat saat dirilis
-- [ ] Akun admin di Supabase di-set role=admin dan migrasi 003 diterapkan
+- [x] Akun admin di Supabase di-set role=admin dan migrasi 003 diterapkan (terverifikasi 3 Nov 2026 ~23:00 WITA; sudah ada di database, tidak dijalankan ulang)
 - [ ] QRIS pusat dirilis Asra, fallback seller dinonaktifkan
 
 ## Checklist pembaruan — Detail layanan (3 November 2026)
@@ -29,7 +40,7 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [x] Halaman detail layanan `/catalog/[id]` dibuat: judul, kategori, harga, deskripsi, sampul, info toko seller, ulasan seller, dan formulir pesanan (jumlah 1–50 + catatan buyer) yang memanggil `createOrderAction`
 - [x] Halaman menangani layanan tidak ditemukan/tidak aktif, layanan milik sendiri (tidak bisa dipesan), dan pengunjung belum login (diarahkan ke login dengan `next` kembali ke detail layanan)
 - [x] Typecheck lolos dan build Next.js lolos; route `/catalog/[id]` terdaftar sebagai dynamic
-- [ ] PR di-merge dan halaman detail diverifikasi live di jasa-in.my.id
+- [x] PR di-merge dan halaman detail diverifikasi live di jasa-in.my.id
 
 ## Checklist pembaruan — Galeri foto jasa (3 November 2026)
 
@@ -38,8 +49,8 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [x] Katalog `/catalog` menampilkan sampul jasa; halaman detail `/catalog/[id]` menampilkan galeri lengkap (foto utama + thumbnail), dengan fallback ke cover untuk jasa lama
 - [x] Form tambah foto ke jasa yang sudah ada di dashboard (hanya seller pemilik jasa, dibatasi total 10 foto per jasa)
 - [x] Typecheck lolos dan build Next.js lolos
-- [ ] PR galeri foto di-merge ke main dan diverifikasi live
-- [ ] Migrasi `004_service_images.sql` diterapkan di Supabase (bucket + tabel + kebijakan); tanpa ini upload foto gagal dan jasa tetap bisa dibuat tanpa foto
+- [x] PR galeri foto di-merge ke main dan diverifikasi live
+- [x] Migrasi `004_service_images.sql` diterapkan di Supabase (bucket + tabel + kebijakan) (terverifikasi sudah ada di database 3 Nov 2026 ~23:00 WITA; tidak dijalankan ulang)
 
 ## Checklist pembaruan — Keamanan order (3 November 2026)
 
@@ -48,9 +59,9 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [x] `confirmOrderPaymentAction` kini hanya untuk payment `submitted` dan pesanan `pending_payment` (konfirmasi), dengan cek error sehingga kegagalan RLS tidak tampil sebagai sukses; penolakan hanya untuk payment `submitted`
 - [x] `submitReviewAction` kini memverifikasi pembeli, status `completed`, dan seller ulasan harus cocok dengan seller pesanan
 - [x] `createOrderAction` kini menghapus pesanan jika insert item atau payment gagal, supaya tidak ada pesanan tanpa item/payment
-- [ ] PR keamanan order di-merge ke main dan diverifikasi live
+- [x] PR keamanan order di-merge ke main dan diverifikasi live
 - [ ] Transaksi atomik penuh via RPC untuk create order (S7) — saat ini masih cleanup kompensasi, bukan satu transaksi database
-- [ ] Migrasi `003_admin_payments.sql` diterapkan dan role admin di-set, supaya konfirmasi admin tidak diblokir RLS
+- [x] Migrasi `003_admin_payments.sql` diterapkan dan role admin di-set, supaya konfirmasi admin tidak diblokir RLS (terverifikasi 3 Nov 2026 ~23:00 WITA)
 
 ## 1. Ringkasan
 
