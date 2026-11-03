@@ -429,7 +429,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     className="form-textarea"
                   />
                   <span className="form-hint">
-                    Saat pembeli melakukan checkout, sistem otomatis mengubah payload ini menjadi QRIS Dinamis sesuai nominal pesanan.
+                    QRIS seller ini hanya fallback sementara. Setelah QRIS
+                    pusat Jasa-in dirilis, pembayaran akan memakai QRIS
+                    Jasa-in dan pengaturan ini tidak lagi dipakai.
                   </span>
                 </div>
 
