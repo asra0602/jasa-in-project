@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { makeDynamicQris } from "@/lib/qris";
+import { notifyPaymentProofToSellerGroup } from "@/lib/telegram";
 
 function buildOrderNumber(): string {
   const now = new Date();
@@ -95,8 +96,20 @@ export async function createOrderAction(formData: FormData) {
     redirect(`/orders/${order.id}?error=${encodeURIComponent("Detail item pesanan gagal disimpan.")}`);
   }
 
+  // QRIS pusat Jasa-in (server-only env, sengaja boleh kosong dulu).
+  // Slot ini disiapkan agar Asra bisa merilis QRIS pusat kapan saja tanpa
+  // ubah kode lagi: cukup isi JASA_IN_QRIS_STATIC_PAYLOAD di Vercel.
+  // Selama slot pusat masih kosong, QRIS seller dipakai sebagai fallback
+  // sementara agar pesanan tidak langsung kehilangan QRIS.
+  const centralQris = process.env.JASA_IN_QRIS_STATIC_PAYLOAD?.trim() ?? "";
   let dynamicQris: string | null = null;
-  if (sellerProfile?.qris_enabled && sellerProfile.qris_static_payload) {
+  if (centralQris) {
+    try {
+      dynamicQris = makeDynamicQris(centralQris, totalIdr);
+    } catch {
+      dynamicQris = null;
+    }
+  } else if (sellerProfile?.qris_enabled && sellerProfile.qris_static_payload) {
     try {
       dynamicQris = makeDynamicQris(sellerProfile.qris_static_payload, totalIdr);
     } catch {
@@ -147,9 +160,29 @@ export async function submitPaymentProofAction(formData: FormData) {
     redirect(`/orders/${orderId}?error=${encodeURIComponent("Gagal mengirim bukti pembayaran.")}`);
   }
 
+  // Notifikasi best-effort ke grup Telegram seller/admin. Kegagalan kirim
+  // tidak menggagalkan pengiriman bukti pembayaran.
+  try {
+    const { data: orderInfo } = await supabase
+      .from("orders")
+      .select("order_number, total_idr")
+      .eq("id", orderId)
+      .single();
+    if (orderInfo) {
+      await notifyPaymentProofToSellerGroup({
+        orderNumber: orderInfo.order_number,
+        orderId,
+        amountIdr: Number(orderInfo.total_idr),
+        proofReference,
+      });
+    }
+  } catch {
+    // Abaikan: bukti pembayaran sudah tersimpan di atas.
+  }
+
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/dashboard");
-  redirect(`/orders/${orderId}?message=${encodeURIComponent("Bukti pembayaran berhasil dikirim. Menunggu verifikasi seller.")}`);
+  redirect(`/orders/${orderId}?message=${encodeURIComponent("Bukti pembayaran berhasil dikirim. Menunggu verifikasi admin Jasa-in.")}`);
 }
 
 export async function confirmOrderPaymentAction(formData: FormData) {
@@ -169,27 +202,58 @@ export async function confirmOrderPaymentAction(formData: FormData) {
     redirect("/login");
   }
 
+  // Verifikasi pembayaran kini dipegang admin Jasa-in. Seller tetap boleh
+  // memverifikasi sebagai fallback sampai role admin aktif, karena RLS
+  // yang ada saat ini hanya mengizinkan partisipan pesanan. Migrasi
+  // 003_admin_payments.sql menyiapkan kebijakan RLS untuk admin.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  const { data: orderRow } = await supabase
+    .from("orders")
+    .select("seller_id")
+    .eq("id", orderId)
+    .single();
+  const isAdmin = profile?.role === "admin";
+  const isSeller = orderRow?.seller_id === user.id;
+  if (!isAdmin && !isSeller) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Hanya admin Jasa-in atau seller pesanan yang dapat memverifikasi pembayaran.")}`,
+    );
+  }
+
   if (decision === "confirm") {
-    await supabase
+    const paymentUpdate = supabase
       .from("payments")
       .update({
         status: "confirmed",
         confirmed_at: new Date().toISOString(),
       })
-      .eq("order_id", orderId)
-      .eq("seller_id", user.id);
+      .eq("order_id", orderId);
+    if (!isAdmin) {
+      paymentUpdate.eq("seller_id", user.id);
+    }
+    await paymentUpdate;
 
-    await supabase
+    const orderUpdate = supabase
       .from("orders")
       .update({ status: "paid" })
-      .eq("id", orderId)
-      .eq("seller_id", user.id);
+      .eq("id", orderId);
+    if (!isAdmin) {
+      orderUpdate.eq("seller_id", user.id);
+    }
+    await orderUpdate;
   } else {
-    await supabase
+    const paymentUpdate = supabase
       .from("payments")
       .update({ status: "rejected" })
-      .eq("order_id", orderId)
-      .eq("seller_id", user.id);
+      .eq("order_id", orderId);
+    if (!isAdmin) {
+      paymentUpdate.eq("seller_id", user.id);
+    }
+    await paymentUpdate;
   }
 
   revalidatePath(`/orders/${orderId}`);

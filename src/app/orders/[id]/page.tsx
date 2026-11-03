@@ -65,7 +65,18 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
     .eq("id", id)
     .single();
 
-  if (!order || (order.buyer_id !== user.id && order.seller_id !== user.id)) {
+  const { data: viewerProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  const isAdmin = viewerProfile?.role === "admin";
+  if (
+    !order ||
+    (order.buyer_id !== user.id &&
+      order.seller_id !== user.id &&
+      !isAdmin)
+  ) {
     notFound();
   }
 
@@ -301,7 +312,8 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
               </div>
             ) : (
               <div className="alert alert-error">
-                Seller belum mengatur payload QRIS Statis di tokonya. Hubungi seller atau minta seller mengaktifkan QRIS di Dashboard.
+                QRIS pusat Jasa-in belum dirilis. Pembayaran untuk pesanan ini
+                akan memakai QRIS Jasa-in setelah dirilis oleh admin.
               </div>
             )}
 
@@ -335,9 +347,13 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
               </form>
             ) : null}
 
-            {isSeller && payment?.status === "submitted" ? (
+            {(isAdmin || isSeller) && payment?.status === "submitted" ? (
               <div className="seller-verify-box">
-                <p className="seller-fields-title">Verifikasi Pembayaran Pembeli</p>
+                <p className="seller-fields-title">
+                  {isAdmin
+                    ? "Verifikasi Pembayaran (Admin Jasa-in)"
+                    : "Verifikasi Pembayaran Pembeli"}
+                </p>
                 <div className="hero-actions">
                   <form action={confirmOrderPaymentAction}>
                     <input type="hidden" name="order_id" value={order.id} />
