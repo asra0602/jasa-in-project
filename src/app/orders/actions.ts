@@ -93,7 +93,10 @@ export async function createOrderAction(formData: FormData) {
   });
 
   if (itemError) {
-    redirect(`/orders/${order.id}?error=${encodeURIComponent("Detail item pesanan gagal disimpan.")}`);
+    // Jangan tinggalkan pesanan yatim tanpa item: hapus pesanan yang
+    // baru dibuat (payment belum dibuat, jadi tidak ada yang menahan).
+    await supabase.from("orders").delete().eq("id", order.id);
+    redirect(`/catalog/${serviceId}?error=${encodeURIComponent("Detail item pesanan gagal disimpan.")}`);
   }
 
   // QRIS pusat Jasa-in (server-only env, sengaja boleh kosong dulu).
@@ -117,13 +120,20 @@ export async function createOrderAction(formData: FormData) {
     }
   }
 
-  await supabase.from("payments").insert({
+  const { error: paymentError } = await supabase.from("payments").insert({
     order_id: order.id,
     seller_id: service.seller_id,
     amount_idr: totalIdr,
     status: "pending",
     qris_payload: dynamicQris,
   });
+
+  if (paymentError) {
+    // Payment gagal dibuat: hapus pesanan + item (item terhapus lewat
+    // cascade order_items) supaya tidak ada pesanan tanpa pembayaran.
+    await supabase.from("orders").delete().eq("id", order.id);
+    redirect(`/catalog/${serviceId}?error=${encodeURIComponent("Gagal membuat pembayaran pesanan. Silakan coba beberapa saat lagi.")}`);
+  }
 
   revalidatePath("/dashboard");
   redirect(`/orders/${order.id}`);
@@ -148,6 +158,30 @@ export async function submitPaymentProofAction(formData: FormData) {
     redirect("/login");
   }
 
+  // Keamanan order: bukti hanya boleh dikirim pembeli pesanan itu, dan
+  // hanya saat pesanan masih menunggu pembayaran dan payment belum
+  // dikonfirmasi. Seller tidak boleh mengirim bukti untuk pesanannya
+  // sendiri, dan bukti tidak boleh menimpa payment yang sudah confirmed.
+  const { data: orderRow } = await supabase
+    .from("orders")
+    .select("id, buyer_id, order_number, total_idr, status")
+    .eq("id", orderId)
+    .single();
+  if (!orderRow || orderRow.buyer_id !== user.id) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Hanya pembeli pesanan yang dapat mengirim bukti pembayaran.")}`);
+  }
+  if (orderRow.status !== "pending_payment") {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Pesanan ini sudah tidak menunggu pembayaran.")}`);
+  }
+  const { data: paymentRow } = await supabase
+    .from("payments")
+    .select("status")
+    .eq("order_id", orderId)
+    .single();
+  if (!paymentRow || !["pending", "rejected"].includes(paymentRow.status)) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Bukti pembayaran tidak dapat dikirim untuk status pembayaran ini.")}`);
+  }
+
   const { error } = await supabase
     .from("payments")
     .update({
@@ -163,19 +197,12 @@ export async function submitPaymentProofAction(formData: FormData) {
   // Notifikasi best-effort ke grup Telegram seller/admin. Kegagalan kirim
   // tidak menggagalkan pengiriman bukti pembayaran.
   try {
-    const { data: orderInfo } = await supabase
-      .from("orders")
-      .select("order_number, total_idr")
-      .eq("id", orderId)
-      .single();
-    if (orderInfo) {
-      await notifyPaymentProofToSellerGroup({
-        orderNumber: orderInfo.order_number,
-        orderId,
-        amountIdr: Number(orderInfo.total_idr),
-        proofReference,
-      });
-    }
+    await notifyPaymentProofToSellerGroup({
+      orderNumber: orderRow.order_number,
+      orderId,
+      amountIdr: Number(orderRow.total_idr),
+      proofReference,
+    });
   } catch {
     // Abaikan: bukti pembayaran sudah tersimpan di atas.
   }
@@ -213,47 +240,73 @@ export async function confirmOrderPaymentAction(formData: FormData) {
     .single();
   const { data: orderRow } = await supabase
     .from("orders")
-    .select("seller_id")
+    .select("seller_id, status")
     .eq("id", orderId)
     .single();
   const isAdmin = profile?.role === "admin";
   const isSeller = orderRow?.seller_id === user.id;
-  if (!isAdmin && !isSeller) {
+  if (!orderRow || (!isAdmin && !isSeller)) {
     redirect(
       `/orders/${orderId}?error=${encodeURIComponent("Hanya admin Jasa-in atau seller pesanan yang dapat memverifikasi pembayaran.")}`,
     );
   }
 
+  // Keamanan order: verifikasi hanya berlaku untuk payment yang sudah
+  // submitted, dan konfirmasi hanya saat pesanan masih pending_payment.
+  // Ini mencegah konfirmasi tanpa bukti, konfirmasi berulang, dan
+  // penolakan setelah pembayaran sudah dikonfirmasi.
+  const { data: paymentRow } = await supabase
+    .from("payments")
+    .select("status")
+    .eq("order_id", orderId)
+    .single();
+  if (!paymentRow || paymentRow.status !== "submitted") {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Pembayaran ini tidak sedang menunggu verifikasi.")}`);
+  }
+
   if (decision === "confirm") {
+    if (orderRow.status !== "pending_payment") {
+      redirect(`/orders/${orderId}?error=${encodeURIComponent("Pesanan ini sudah tidak menunggu pembayaran.")}`);
+    }
     const paymentUpdate = supabase
       .from("payments")
       .update({
         status: "confirmed",
         confirmed_at: new Date().toISOString(),
       })
-      .eq("order_id", orderId);
+      .eq("order_id", orderId)
+      .eq("status", "submitted");
     if (!isAdmin) {
       paymentUpdate.eq("seller_id", user.id);
     }
-    await paymentUpdate;
+    const { error: paymentError } = await paymentUpdate;
 
     const orderUpdate = supabase
       .from("orders")
       .update({ status: "paid" })
-      .eq("id", orderId);
+      .eq("id", orderId)
+      .eq("status", "pending_payment");
     if (!isAdmin) {
       orderUpdate.eq("seller_id", user.id);
     }
-    await orderUpdate;
+    const { error: orderError } = await orderUpdate;
+
+    if (paymentError || orderError) {
+      redirect(`/orders/${orderId}?error=${encodeURIComponent("Gagal mengonfirmasi pembayaran. Periksa kembali status pesanan.")}`);
+    }
   } else {
     const paymentUpdate = supabase
       .from("payments")
       .update({ status: "rejected" })
-      .eq("order_id", orderId);
+      .eq("order_id", orderId)
+      .eq("status", "submitted");
     if (!isAdmin) {
       paymentUpdate.eq("seller_id", user.id);
     }
-    await paymentUpdate;
+    const { error: paymentError } = await paymentUpdate;
+    if (paymentError) {
+      redirect(`/orders/${orderId}?error=${encodeURIComponent("Gagal menolak pembayaran. Periksa kembali status pembayaran.")}`);
+    }
   }
 
   revalidatePath(`/orders/${orderId}`);
@@ -285,10 +338,40 @@ export async function updateOrderStatusAction(formData: FormData) {
     redirect("/login");
   }
 
+  // Keamanan order: hanya partisipan yang boleh mengubah status, dan
+  // hanya transisi yang sah sesuai peran. Ini mengikuti tombol di UI:
+  // seller paid -> in_progress -> delivered, pembeli delivered ->
+  // completed, dan pembatalan hanya oleh partisipan saat masih
+  // pending_payment (sebelum dibayar). Tanpa ini, pembeli bisa
+  // menyelesaikan pesanan yang belum dibayar dan seller bisa membatalkan
+  // pesanan yang sudah dibayar.
+  const { data: orderRow } = await supabase
+    .from("orders")
+    .select("buyer_id, seller_id, status")
+    .eq("id", orderId)
+    .single();
+  if (!orderRow) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Pesanan tidak ditemukan.")}`);
+  }
+  const isBuyer = orderRow.buyer_id === user.id;
+  const isSeller = orderRow.seller_id === user.id;
+  if (!isBuyer && !isSeller) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Hanya pembeli atau seller pesanan yang dapat mengubah status.")}`);
+  }
+  const allowedTransition =
+    (isSeller && orderRow.status === "paid" && nextStatus === "in_progress") ||
+    (isSeller && orderRow.status === "in_progress" && nextStatus === "delivered") ||
+    (isBuyer && orderRow.status === "delivered" && nextStatus === "completed") ||
+    ((isBuyer || isSeller) && orderRow.status === "pending_payment" && nextStatus === "cancelled");
+  if (!allowedTransition) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Perubahan status pesanan tidak diizinkan untuk status saat ini.")}`);
+  }
+
   const { error } = await supabase
     .from("orders")
     .update({ status: nextStatus })
-    .eq("id", orderId);
+    .eq("id", orderId)
+    .eq("status", orderRow.status);
 
   if (error) {
     redirect(`/orders/${orderId}?error=${encodeURIComponent("Gagal memperbarui status pesanan.")}`);
@@ -318,10 +401,28 @@ export async function submitReviewAction(formData: FormData) {
     redirect("/login");
   }
 
+  // Keamanan order: ulasan hanya dari pembeli pesanan itu, hanya saat
+  // pesanan sudah completed, dan seller ulasan harus cocok dengan
+  // seller pesanan — bukan seller sembarang dari input form.
+  const { data: orderRow } = await supabase
+    .from("orders")
+    .select("buyer_id, seller_id, status")
+    .eq("id", orderId)
+    .single();
+  if (!orderRow || orderRow.buyer_id !== user.id) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Hanya pembeli pesanan yang dapat memberikan ulasan.")}`);
+  }
+  if (orderRow.status !== "completed") {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Ulasan hanya dapat diberikan setelah pesanan selesai.")}`);
+  }
+  if (sellerId !== orderRow.seller_id) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Seller ulasan tidak cocok dengan seller pesanan.")}`);
+  }
+
   const { error } = await supabase.from("reviews").insert({
     order_id: orderId,
     buyer_id: user.id,
-    seller_id: sellerId,
+    seller_id: orderRow.seller_id,
     rating,
     comment,
   });
