@@ -31,6 +31,17 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [x] Typecheck lolos dan build Next.js lolos; route `/catalog/[id]` terdaftar sebagai dynamic
 - [ ] PR di-merge dan halaman detail diverifikasi live di jasa-in.my.id
 
+## Checklist pembaruan — Keamanan order (3 November 2026)
+
+- [x] `updateOrderStatusAction` kini memverifikasi partisipan dan hanya mengizinkan transisi sah: seller `paid -> in_progress -> delivered`, pembeli `delivered -> completed`, dan pembatalan hanya oleh partisipan saat `pending_payment`
+- [x] `submitPaymentProofAction` kini hanya dari pembeli pesanan, hanya saat pesanan `pending_payment` dan payment `pending`/`rejected` (bukti tidak menimpa payment yang sudah `confirmed`)
+- [x] `confirmOrderPaymentAction` kini hanya untuk payment `submitted` dan pesanan `pending_payment` (konfirmasi), dengan cek error sehingga kegagalan RLS tidak tampil sebagai sukses; penolakan hanya untuk payment `submitted`
+- [x] `submitReviewAction` kini memverifikasi pembeli, status `completed`, dan seller ulasan harus cocok dengan seller pesanan
+- [x] `createOrderAction` kini menghapus pesanan jika insert item atau payment gagal, supaya tidak ada pesanan tanpa item/payment
+- [ ] PR keamanan order di-merge ke main dan diverifikasi live
+- [ ] Transaksi atomik penuh via RPC untuk create order (S7) — saat ini masih cleanup kompensasi, bukan satu transaksi database
+- [ ] Migrasi `003_admin_payments.sql` diterapkan dan role admin di-set, supaya konfirmasi admin tidak diblokir RLS
+
 ## 1. Ringkasan
 
 Toko jasa edit foto di mana **seller** menjual jasa lewat dashboard, **buyer** memesan lewat katalog global, dan pembayaran memakai **QRIS pusat milik Jasa-in** (statis diubah menjadi dinamis dengan nominal tetap). Dana masuk ke Jasa-in; payout ke seller dilakukan manual untuk tahap ini. Slot QRIS pusat disiapkan lewat variable server `JASA_IN_QRIS_STATIC_PAYLOAD` dan sengaja dikosongkan dulu sampai Asra merilis QRIS pusat; selama slot itu kosong, QRIS seller dipakai sebagai fallback sementara agar pesanan tidak langsung kehilangan QRIS.
