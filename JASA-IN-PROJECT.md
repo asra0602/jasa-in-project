@@ -9,6 +9,14 @@ Pembaruan model pembayaran: 3 November 2026 — pembayaran berubah dari QRIS per
 
 ---
 
+## Checklist pembaruan — Perbaikan upload galeri (3 November 2026)
+
+- [x] Bug 413 diperbaiki: foto tidak lagi dikirim lewat Server Action (batas body 1 MB, foto JPG 1,4 MB sudah gagal sebelum kode jalan dan produk tidak terbuat). Foto kini diunggah langsung dari browser ke Storage `service-images` lewat komponen klien `service-photo-forms.tsx`
+- [x] Server action buat/tambah foto kini hanya menerima URL foto dan memvalidasinya: host Supabase yang sama, bucket `service-images`, path diawali ID jasa yang bersangkutan, ekstensi JPG/PNG/WebP/GIF, maks. 10 foto per jasa
+- [x] Typecheck lolos dan build Next.js lolos
+- [ ] PR perbaikan upload di-merge ke main dan diverifikasi live dengan foto JPG di atas 1 MB
+- [ ] Uji ulang live: buat produk baru dengan foto, pastikan muncul di katalog dan dashboard
+
 ## Checklist pembaruan — Sinkronisasi checklist (3 November 2026)
 
 Dokumen-only: tidak ada perubahan kode. Centang di bawah diperbarui berdasarkan
