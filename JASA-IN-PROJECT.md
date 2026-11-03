@@ -24,6 +24,13 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [ ] Akun admin di Supabase di-set role=admin dan migrasi 003 diterapkan
 - [ ] QRIS pusat dirilis Asra, fallback seller dinonaktifkan
 
+## Checklist pembaruan — Detail layanan (3 November 2026)
+
+- [x] Halaman detail layanan `/catalog/[id]` dibuat: judul, kategori, harga, deskripsi, sampul, info toko seller, ulasan seller, dan formulir pesanan (jumlah 1–50 + catatan buyer) yang memanggil `createOrderAction`
+- [x] Halaman menangani layanan tidak ditemukan/tidak aktif, layanan milik sendiri (tidak bisa dipesan), dan pengunjung belum login (diarahkan ke login dengan `next` kembali ke detail layanan)
+- [x] Typecheck lolos dan build Next.js lolos; route `/catalog/[id]` terdaftar sebagai dynamic
+- [ ] PR di-merge dan halaman detail diverifikasi live di jasa-in.my.id
+
 ## 1. Ringkasan
 
 Toko jasa edit foto di mana **seller** menjual jasa lewat dashboard, **buyer** memesan lewat katalog global, dan pembayaran memakai **QRIS pusat milik Jasa-in** (statis diubah menjadi dinamis dengan nominal tetap). Dana masuk ke Jasa-in; payout ke seller dilakukan manual untuk tahap ini. Slot QRIS pusat disiapkan lewat variable server `JASA_IN_QRIS_STATIC_PAYLOAD` dan sengaja dikosongkan dulu sampai Asra merilis QRIS pusat; selama slot itu kosong, QRIS seller dipakai sebagai fallback sementara agar pesanan tidak langsung kehilangan QRIS.
