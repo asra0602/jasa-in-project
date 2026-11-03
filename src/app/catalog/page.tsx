@@ -44,6 +44,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       description,
       category,
       price_idr,
+      cover_image_url,
       created_at,
       seller_profiles (
         store_name,
@@ -174,6 +175,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
             return (
               <article key={service.id} className="service-card">
+                {service.cover_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    className="service-card-thumb"
+                    src={service.cover_image_url}
+                    alt={`Sampul layanan ${service.title}`}
+                  />
+                ) : null}
                 <div className="service-card-top">
                   <span className="service-category">{service.category}</span>
                   {seller?.qris_enabled ? (

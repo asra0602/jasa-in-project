@@ -67,6 +67,21 @@ export default async function ServiceDetailPage({ params, searchParams }: Servic
         .limit(5)
     : { data: null };
 
+  const { data: galleryImages } = service
+    ? await supabase
+        .from("service_images")
+        .select("id, image_url, sort_order")
+        .eq("service_id", service.id)
+        .order("sort_order", { ascending: true })
+    : { data: null };
+  // Fallback: jasa lama tanpa baris galeri tapi punya cover tetap tampil.
+  const galleryUrls =
+    galleryImages && galleryImages.length > 0
+      ? galleryImages.map((img) => img.image_url)
+      : service?.cover_image_url
+        ? [service.cover_image_url]
+        : [];
+
   const reviewCount = reviews?.length ?? 0;
   const averageRating =
     reviewCount > 0
@@ -133,13 +148,28 @@ export default async function ServiceDetailPage({ params, searchParams }: Servic
                 </p>
               </div>
 
-              {service.cover_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  className="detail-thumb"
-                  src={service.cover_image_url}
-                  alt={`Sampul layanan ${service.title}`}
-                />
+              {galleryUrls.length > 0 ? (
+                <div className="service-gallery">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="detail-thumb"
+                    src={galleryUrls[0]}
+                    alt={`Sampul layanan ${service.title}`}
+                  />
+                  {galleryUrls.length > 1 ? (
+                    <div className="service-gallery-thumbs">
+                      {galleryUrls.map((url, index) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={`${url}-${index}`}
+                          className="service-gallery-thumb"
+                          src={url}
+                          alt={`Foto ${index + 1} layanan ${service.title}`}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               <p className="detail-description">{service.description || "Seller belum menambahkan deskripsi untuk layanan ini."}</p>

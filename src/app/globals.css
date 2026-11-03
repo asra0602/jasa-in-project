@@ -192,12 +192,40 @@ select:focus-visible {
   border-radius: 4px;
   padding: 24px;
 }
+.service-card-thumb {
+  display: block;
+  width: calc(100% + 48px);
+  margin: -24px -24px 16px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-bottom: 1px solid var(--line);
+  border-radius: 4px 4px 0 0;
+  background: var(--line);
+}
 .service-card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 14px;
+}
+.service-gallery {
+  display: grid;
+  gap: 12px;
+}
+.service-gallery-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.service-gallery-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--line);
 }
 .service-category {
   font-size: 11px;

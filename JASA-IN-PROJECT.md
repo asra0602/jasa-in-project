@@ -31,6 +31,16 @@ Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pe
 - [x] Typecheck lolos dan build Next.js lolos; route `/catalog/[id]` terdaftar sebagai dynamic
 - [ ] PR di-merge dan halaman detail diverifikasi live di jasa-in.my.id
 
+## Checklist pembaruan — Galeri foto jasa (3 November 2026)
+
+- [x] Form tambah jasa di dashboard kini punya input foto (maks. 5 foto per unggahan, maks. 10 foto per jasa, masing-masing maks. 5 MB, JPG/PNG/WebP/GIF) yang diunggah ke bucket Storage Supabase `service-images`
+- [x] Foto dicatat di tabel baru `service_images` (migrasi `004_service_images.sql`); foto pertama juga menjadi `cover_image_url` sehingga katalog menampilkan sampul
+- [x] Katalog `/catalog` menampilkan sampul jasa; halaman detail `/catalog/[id]` menampilkan galeri lengkap (foto utama + thumbnail), dengan fallback ke cover untuk jasa lama
+- [x] Form tambah foto ke jasa yang sudah ada di dashboard (hanya seller pemilik jasa, dibatasi total 10 foto per jasa)
+- [x] Typecheck lolos dan build Next.js lolos
+- [ ] PR galeri foto di-merge ke main dan diverifikasi live
+- [ ] Migrasi `004_service_images.sql` diterapkan di Supabase (bucket + tabel + kebijakan); tanpa ini upload foto gagal dan jasa tetap bisa dibuat tanpa foto
+
 ## Checklist pembaruan — Keamanan order (3 November 2026)
 
 - [x] `updateOrderStatusAction` kini memverifikasi partisipan dan hanya mengizinkan transisi sah: seller `paid -> in_progress -> delivered`, pembeli `delivered -> completed`, dan pembatalan hanya oleh partisipan saat `pending_payment`

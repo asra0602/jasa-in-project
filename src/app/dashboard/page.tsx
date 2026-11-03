@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logoutAction } from "@/app/(auth)/actions";
 import {
+  addServicePhotosAction,
   createServiceAction,
   toggleServiceStatusAction,
   updateSellerStoreAction,
@@ -289,7 +290,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="auth-card">
               <p className="eyebrow">TAMBAH LAYANAN BARU</p>
               <h2>Terbitkan jasa ke katalog</h2>
-              <form action={createServiceAction} className="auth-form">
+              <form action={createServiceAction} encType="multipart/form-data" className="auth-form">
                 <div className="form-group">
                   <label className="form-label" htmlFor="title">
                     Judul layanan jasa
@@ -348,6 +349,24 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </div>
 
                 <div className="form-group">
+                  <label className="form-label" htmlFor="photos">
+                    Foto galeri jasa (opsional, maks. 5 foto, masing-masing maks. 5 MB)
+                  </label>
+                  <input
+                    id="photos"
+                    name="photos"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    className="form-input"
+                  />
+                  <span className="form-hint">
+                    Foto pertama menjadi sampul di katalog. Foto diunggah ke
+                    Storage Supabase saat jasa dibuat.
+                  </span>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label" htmlFor="status">
                     Status publikasi awal
                   </label>
@@ -362,6 +381,44 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </button>
               </form>
             </div>
+
+            {isSeller && myServices && myServices.length > 0 ? (
+              <div className="auth-card">
+                <p className="eyebrow">GALERI FOTO JASA</p>
+                <h2>Tambah foto ke jasa yang sudah ada</h2>
+                <form action={addServicePhotosAction} encType="multipart/form-data" className="auth-form">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="gallery_service_id">
+                      Pilih jasa
+                    </label>
+                    <select id="gallery_service_id" name="service_id" required className="form-input">
+                      {myServices.map((srv) => (
+                        <option key={srv.id} value={srv.id}>
+                          {srv.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="gallery_photos">
+                      Foto (maks. 5 foto per unggahan, total maks. 10 foto per jasa)
+                    </label>
+                    <input
+                      id="gallery_photos"
+                      name="photos"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      multiple
+                      required
+                      className="form-input"
+                    />
+                  </div>
+                  <button type="submit" className="button button-dark button-full">
+                    Tambah foto galeri
+                  </button>
+                </form>
+              </div>
+            ) : null}
 
             <div className="auth-card">
               <p className="eyebrow">PENGATURAN TOKO & QRIS STATIS</p>
