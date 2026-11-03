@@ -9,6 +9,21 @@ Pembaruan model pembayaran: 3 November 2026 — pembayaran berubah dari QRIS per
 
 ---
 
+## Checklist pembaruan — PR #1 (3 November 2026)
+
+Aturan kerja ke depan: ikuti langkah di dokumen ini berurutan, dan setiap ada pembaruan, checklist ini diperbarui di commit yang sama.
+
+- [x] Slot QRIS pusat `JASA_IN_QRIS_STATIC_PAYLOAD` disiapkan di kode (kosong dulu, fallback seller sementara)
+- [x] Notifikasi Telegram bukti bayar ke grup seller/admin (`src/lib/telegram.ts`)
+- [x] Konfirmasi pembayaran dibuka untuk admin di kode + migrasi `003_admin_payments.sql` disiapkan (belum diterapkan di Supabase)
+- [x] `.env.local` dihapus dari branch + `.env.example` dibuat (nama key saja, tanpa nilai)
+- [x] Dokumen ini diperbarui ke model QRIS pusat
+- [ ] PR #1 di-merge ke main
+- [ ] Deploy produksi diverifikasi setelah merge
+- [ ] Variable Vercel yang hilang diisi dengan nilai baru hasil rotasi: SAWERIA_URL, SAWERIA_WEBHOOK_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, plus slot QRIS pusat saat dirilis
+- [ ] Akun admin di Supabase di-set role=admin dan migrasi 003 diterapkan
+- [ ] QRIS pusat dirilis Asra, fallback seller dinonaktifkan
+
 ## 1. Ringkasan
 
 Toko jasa edit foto di mana **seller** menjual jasa lewat dashboard, **buyer** memesan lewat katalog global, dan pembayaran memakai **QRIS pusat milik Jasa-in** (statis diubah menjadi dinamis dengan nominal tetap). Dana masuk ke Jasa-in; payout ke seller dilakukan manual untuk tahap ini. Slot QRIS pusat disiapkan lewat variable server `JASA_IN_QRIS_STATIC_PAYLOAD` dan sengaja dikosongkan dulu sampai Asra merilis QRIS pusat; selama slot itu kosong, QRIS seller dipakai sebagai fallback sementara agar pesanan tidak langsung kehilangan QRIS.
