@@ -7,70 +7,80 @@ import { buildDummyStaticQris, validateStaticQrisPayload } from "@/lib/qris";
 
 const STORE_SLUG_REGEX = /^[a-z0-9-]{3,40}$/;
 
-// Galeri foto jasa: maksimal 5 foto per unggahan, maksimal 10 foto per
-// jasa, masing-masing maksimal 5 MB, hanya gambar. Foto disimpan di
-// bucket Storage Supabase "service-images" (migrasi 004) dan dicatat di
-// tabel service_images; foto pertama juga menjadi cover_image_url agar
-// katalog bisa menampilkan sampul.
+// Galeri foto jasa (diperbaiki 3 Nov 2026, bug 413): foto TIDAK dikirim
+// lewat Server Action, karena body Server Action dibatasi 1 MB dan foto
+// HP normal sudah gagal sebelum kode server jalan. Foto diunggah
+// langsung dari browser ke bucket Storage "service-images" (migrasi
+// 004), lalu server hanya menerima URL foto (teks pendek) dan
+// memvalidasinya di sini: URL harus dari bucket itu, host Supabase
+// yang sama, dan path-nya harus diawali ID jasa yang bersangkutan.
+// Foto pertama juga menjadi cover_image_url agar katalog menampilkan
+// sampul. Maksimal 10 foto per jasa.
 const SERVICE_IMAGES_BUCKET = "service-images";
-const MAX_PHOTOS_PER_UPLOAD = 5;
 const MAX_PHOTOS_PER_SERVICE = 10;
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const ALLOWED_PHOTO_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PHOTO_URL_EXT_REGEX = /\.(jpg|png|webp|gif)$/i;
 
-function collectPhotoFiles(formData: FormData): File[] {
-  return formData
-    .getAll("photos")
-    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+function collectPhotoUrls(formData: FormData): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const entry of formData.getAll("photo_url")) {
+    const url = String(entry).trim();
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      urls.push(url);
+    }
+  }
+  return urls;
 }
 
-function validatePhotoFiles(files: File[]): string | null {
-  if (files.length > MAX_PHOTOS_PER_UPLOAD) {
-    return `Maksimal ${MAX_PHOTOS_PER_UPLOAD} foto per unggahan.`;
+function storagePathFromUrl(url: string): string | null {
+  const marker = `/${SERVICE_IMAGES_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index < 0) return null;
+  return url.slice(index + marker.length);
+}
+
+function validatePhotoUrls(urls: string[], serviceId: string): string | null {
+  if (urls.length > MAX_PHOTOS_PER_SERVICE) {
+    return `Galeri jasa maksimal ${MAX_PHOTOS_PER_SERVICE} foto.`;
   }
-  for (const file of files) {
-    if (!ALLOWED_PHOTO_TYPES[file.type]) {
-      return "Foto harus berformat JPG, PNG, WebP, atau GIF.";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return "Konfigurasi Supabase tidak ditemukan.";
+  let supabaseHost: string;
+  try {
+    supabaseHost = new URL(supabaseUrl).host;
+  } catch {
+    return "Konfigurasi Supabase tidak valid.";
+  }
+  for (const url of urls) {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return "URL foto tidak valid.";
     }
-    if (file.size > MAX_PHOTO_BYTES) {
-      return "Setiap foto maksimal 5 MB.";
+    if (parsed.protocol !== "https:" || parsed.host !== supabaseHost) {
+      return "URL foto harus berasal dari Storage Supabase Jasa-in.";
+    }
+    if (!parsed.pathname.startsWith(`/storage/v1/object/public/${SERVICE_IMAGES_BUCKET}/${serviceId}/`)) {
+      return "URL foto tidak cocok dengan jasa yang bersangkutan.";
+    }
+    if (!PHOTO_URL_EXT_REGEX.test(parsed.pathname)) {
+      return "Foto harus berformat JPG, PNG, WebP, atau GIF.";
     }
   }
   return null;
 }
 
-async function uploadServicePhotos(
+async function removePhotoUrls(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  serviceId: string,
-  files: File[],
-): Promise<{ urls: string[]; paths: string[] } | { error: string }> {
-  const urls: string[] = [];
-  const paths: string[] = [];
-  for (const file of files) {
-    const ext = ALLOWED_PHOTO_TYPES[file.type];
-    const path = `${serviceId}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage
-      .from(SERVICE_IMAGES_BUCKET)
-      .upload(path, file, { contentType: file.type, upsert: false });
-    if (error) {
-      // Hapus foto yang sudah terunggah supaya tidak ada file yatim.
-      for (const uploaded of paths) {
-        await supabase.storage.from(SERVICE_IMAGES_BUCKET).remove([uploaded]);
-      }
-      return {
-        error:
-          "Gagal mengunggah foto. Pastikan bucket Storage 'service-images' sudah diterapkan (migrasi 004).",
-      };
-    }
-    paths.push(path);
-    urls.push(supabase.storage.from(SERVICE_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl);
+  urls: string[],
+) {
+  const paths = urls.map(storagePathFromUrl).filter((p): p is string => Boolean(p));
+  if (paths.length > 0) {
+    await supabase.storage.from(SERVICE_IMAGES_BUCKET).remove(paths);
   }
-  return { urls, paths };
 }
 
 function redirectDashboard(params: Record<string, string>): never {
@@ -218,23 +228,34 @@ export async function createServiceAction(formData: FormData) {
     redirect("/login");
   }
 
-  const photos = collectPhotoFiles(formData);
-  const photoError = validatePhotoFiles(photos);
-  if (photoError) {
-    redirectDashboard({ error: photoError });
+  // Foto sudah diunggah dari browser; server hanya menerima URL-nya.
+  // Ini yang memperbaiki bug 413: tidak ada File di body Server Action.
+  const photoUrls = collectPhotoUrls(formData);
+  const clientServiceId = String(formData.get("client_service_id") ?? "").trim();
+  if (photoUrls.length > 0) {
+    if (!UUID_REGEX.test(clientServiceId)) {
+      redirectDashboard({ error: "ID foto galeri tidak valid. Pilih ulang foto jasa." });
+    }
+    const urlError = validatePhotoUrls(photoUrls, clientServiceId);
+    if (urlError) {
+      redirectDashboard({ error: urlError });
+    }
   }
 
   const baseSlug = slugifyTitle(title) || "jasa";
   const uniqueSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
-  const serviceId = crypto.randomUUID();
+  const serviceId = photoUrls.length > 0 ? clientServiceId : crypto.randomUUID();
 
-  let photoUrls: string[] = [];
-  if (photos.length > 0) {
-    const uploaded = await uploadServicePhotos(supabase, serviceId, photos);
-    if ("error" in uploaded) {
-      redirectDashboard({ error: uploaded.error });
+  if (photoUrls.length > 0) {
+    // ID dari browser harus belum dipakai jasa lain.
+    const { data: existing } = await supabase
+      .from("services")
+      .select("id")
+      .eq("id", serviceId)
+      .maybeSingle();
+    if (existing) {
+      redirectDashboard({ error: "ID foto galeri sudah dipakai. Pilih ulang foto jasa." });
     }
-    photoUrls = uploaded.urls;
   }
 
   const { error } = await supabase.from("services").insert({
@@ -250,13 +271,8 @@ export async function createServiceAction(formData: FormData) {
   });
 
   if (error) {
-    // Jasa gagal dibuat: hapus foto yang sudah terunggah.
-    if (photoUrls.length > 0) {
-      const paths = photoUrls.map((url) => url.split(`/${SERVICE_IMAGES_BUCKET}/`)[1]).filter(Boolean);
-      if (paths.length > 0) {
-        await supabase.storage.from(SERVICE_IMAGES_BUCKET).remove(paths);
-      }
-    }
+    // Jasa gagal dibuat: hapus foto yang sudah terunggah di browser.
+    await removePhotoUrls(supabase, photoUrls);
     redirectDashboard({ error: "Gagal menambahkan jasa baru. Pastikan profil toko sudah aktif." });
   }
 
@@ -272,10 +288,7 @@ export async function createServiceAction(formData: FormData) {
       // Galeri gagal dicatat: hapus jasa + foto supaya tidak ada data
       // setengah jadi (jasa tanpa galeri).
       await supabase.from("services").delete().eq("id", serviceId);
-      const paths = photoUrls.map((url) => url.split(`/${SERVICE_IMAGES_BUCKET}/`)[1]).filter(Boolean);
-      if (paths.length > 0) {
-        await supabase.storage.from(SERVICE_IMAGES_BUCKET).remove(paths);
-      }
+      await removePhotoUrls(supabase, photoUrls);
       redirectDashboard({ error: "Gagal menyimpan galeri foto jasa." });
     }
   }
@@ -287,10 +300,13 @@ export async function createServiceAction(formData: FormData) {
 
 export async function addServicePhotosAction(formData: FormData) {
   const serviceId = String(formData.get("service_id") ?? "").trim();
-  const photos = collectPhotoFiles(formData);
-  const photoError = validatePhotoFiles(photos);
-  if (!serviceId || photoError) {
-    redirectDashboard({ error: photoError ?? "Pilih jasa yang akan ditambah fotonya." });
+  const photoUrls = collectPhotoUrls(formData);
+  if (!serviceId || photoUrls.length === 0) {
+    redirectDashboard({ error: "Pilih jasa dan foto yang akan ditambah." });
+  }
+  const urlError = validatePhotoUrls(photoUrls, serviceId);
+  if (urlError) {
+    redirectDashboard({ error: urlError });
   }
 
   const supabase = await createClient();
@@ -316,37 +332,29 @@ export async function addServicePhotosAction(formData: FormData) {
     .from("service_images")
     .select("id", { count: "exact", head: true })
     .eq("service_id", serviceId);
-  if ((count ?? 0) + photos.length > MAX_PHOTOS_PER_SERVICE) {
+  if ((count ?? 0) + photoUrls.length > MAX_PHOTOS_PER_SERVICE) {
     redirectDashboard({
       error: `Galeri jasa maksimal ${MAX_PHOTOS_PER_SERVICE} foto.`,
     });
   }
 
-  const uploaded = await uploadServicePhotos(supabase, serviceId, photos);
-  if ("error" in uploaded) {
-    redirectDashboard({ error: uploaded.error });
-  }
-
   const startOrder = count ?? 0;
   const { error: imagesError } = await supabase.from("service_images").insert(
-    uploaded.urls.map((imageUrl, index) => ({
+    photoUrls.map((imageUrl, index) => ({
       service_id: serviceId,
       image_url: imageUrl,
       sort_order: startOrder + index,
     })),
   );
   if (imagesError) {
-    const paths = uploaded.urls.map((url) => url.split(`/${SERVICE_IMAGES_BUCKET}/`)[1]).filter(Boolean);
-    if (paths.length > 0) {
-      await supabase.storage.from(SERVICE_IMAGES_BUCKET).remove(paths);
-    }
+    await removePhotoUrls(supabase, photoUrls);
     redirectDashboard({ error: "Gagal menyimpan galeri foto jasa." });
   }
 
-  if (!service.cover_image_url && uploaded.urls[0]) {
+  if (!service.cover_image_url && photoUrls[0]) {
     await supabase
       .from("services")
-      .update({ cover_image_url: uploaded.urls[0] })
+      .update({ cover_image_url: photoUrls[0] })
       .eq("id", serviceId)
       .eq("seller_id", user.id);
   }

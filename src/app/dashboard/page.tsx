@@ -9,6 +9,10 @@ import {
   updateSellerStoreAction,
   upgradeToSellerAction,
 } from "@/app/dashboard/actions";
+import {
+  AddServicePhotosField,
+  CreateServicePhotoField,
+} from "@/app/dashboard/service-photo-forms";
 import { SERVICE_CATEGORIES } from "@/lib/categories";
 import { validateQrisPayload } from "@/lib/qris";
 
@@ -290,7 +294,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="auth-card">
               <p className="eyebrow">TAMBAH LAYANAN BARU</p>
               <h2>Terbitkan jasa ke katalog</h2>
-              <form action={createServiceAction} encType="multipart/form-data" className="auth-form">
+              <form action={createServiceAction} className="auth-form">
                 <div className="form-group">
                   <label className="form-label" htmlFor="title">
                     Judul layanan jasa
@@ -348,23 +352,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label" htmlFor="photos">
-                    Foto galeri jasa (opsional, maks. 5 foto, masing-masing maks. 5 MB)
-                  </label>
-                  <input
-                    id="photos"
-                    name="photos"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    multiple
-                    className="form-input"
-                  />
-                  <span className="form-hint">
-                    Foto pertama menjadi sampul di katalog. Foto diunggah ke
-                    Storage Supabase saat jasa dibuat.
-                  </span>
-                </div>
+                <CreateServicePhotoField />
 
                 <div className="form-group">
                   <label className="form-label" htmlFor="status">
@@ -386,33 +374,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="auth-card">
                 <p className="eyebrow">GALERI FOTO JASA</p>
                 <h2>Tambah foto ke jasa yang sudah ada</h2>
-                <form action={addServicePhotosAction} encType="multipart/form-data" className="auth-form">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="gallery_service_id">
-                      Pilih jasa
-                    </label>
-                    <select id="gallery_service_id" name="service_id" required className="form-input">
-                      {myServices.map((srv) => (
-                        <option key={srv.id} value={srv.id}>
-                          {srv.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="gallery_photos">
-                      Foto (maks. 5 foto per unggahan, total maks. 10 foto per jasa)
-                    </label>
-                    <input
-                      id="gallery_photos"
-                      name="photos"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      multiple
-                      required
-                      className="form-input"
-                    />
-                  </div>
+                <form action={addServicePhotosAction} className="auth-form">
+                  <AddServicePhotosField
+                    services={myServices.map((srv) => ({ id: srv.id, title: srv.title }))}
+                  />
                   <button type="submit" className="button button-dark button-full">
                     Tambah foto galeri
                   </button>
