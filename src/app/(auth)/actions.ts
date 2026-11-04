@@ -34,9 +34,25 @@ export async function loginAction(formData: FormData) {
   });
 
   if (error) {
+    const code = (error as { code?: string }).code ?? "";
+    const status = (error as { status?: number }).status;
+
+    // Dicatat di log server (Vercel > Logs) supaya penyebab asli bisa dilihat. Password tidak dicatat.
+    console.error("[loginAction] gagal masuk", { code, status, message: error.message });
+
+    let message = "Email atau kata sandi tidak sesuai. Silakan periksa kembali.";
+    if (code === "email_not_confirmed" || /not confirmed/i.test(error.message)) {
+      message =
+        "Email belum diverifikasi. Buka kotak masuk (cek juga folder spam), klik link konfirmasi, lalu coba masuk lagi.";
+    } else if (status === 429 || /rate_limit/i.test(code)) {
+      message = "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.";
+    } else if (code !== "invalid_credentials" && !/invalid login credentials/i.test(error.message)) {
+      message = `Gagal masuk (kode: ${code || status || "tidak diketahui"}). Silakan coba lagi.`;
+    }
+
     redirect(
       buildRedirectUrl("/login", {
-        error: "Email atau kata sandi tidak sesuai. Silakan periksa kembali.",
+        error: message,
         next: safeNext,
       })
     );

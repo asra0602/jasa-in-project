@@ -9,6 +9,16 @@ Pembaruan model pembayaran: 3 November 2026 — pembayaran berubah dari QRIS per
 
 ---
 
+## Checklist pembaruan — Pesan error login spesifik (5 November 2026)
+
+- [x] `loginAction` di `src/app/(auth)/actions.ts` (yang dipakai halaman `/login`) kini membedakan penyebab gagal login: email belum dikonfirmasi, terlalu banyak percobaan (rate limit), dan kode error lain; kredensial salah tetap memakai pesan generik
+- [x] Penyebab asli dicatat di log server (Vercel > Logs) tanpa mencatat password
+- [x] Typecheck lolos dan build Next.js lolos
+- [ ] PR di-merge dan diverifikasi live: login dengan password salah, dan login akun belum konfirmasi menunjukkan pesan berbeda yang benar
+- [ ] Tes auth 5 langkah selesai (daftar baru, email dipakai, password salah, daftar seller, mini-flow pesanan)
+
+Catatan: file duplikat `src/app/login/actions.ts` tidak diubah atau dihapus di PR ini karena tidak dipakai halaman `/login` (pencarian kode tidak menemukan import-nya); pembersihan duplikat bisa jadi PR terpisah.
+
 ## Checklist pembaruan — Perbaikan upload galeri (3 November 2026)
 
 - [x] Bug 413 diperbaiki: foto tidak lagi dikirim lewat Server Action (batas body 1 MB, foto JPG 1,4 MB sudah gagal sebelum kode jalan dan produk tidak terbuat). Foto kini diunggah langsung dari browser ke Storage `service-images` lewat komponen klien `service-photo-forms.tsx`
